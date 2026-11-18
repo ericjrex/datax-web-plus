@@ -38,6 +38,10 @@
 - **字段类型跨库智能映射与 DDL 推导**：内置 DataTypeConverter 智能转换器，根据源库表自动推导并生成目标库 CREATE TABLE / ALTER TABLE 语句。
 - **字段注释自动演进与批量评审**：自动提取源端与字典备注演进，提供批量 DDL 手动/自动评审工单，防止生产同步任务因上游改表而中断。
 
+<p align="center">
+  <img src="doc/images/01_schema_drift.png" alt="Schema 漂移探测与自适应演进看板" width="95%" />
+</p>
+
 ### 2. 🛡️ 数仓 OpenAPI 安全网关 (Secure Warehouse OpenAPI Gateway)
 - **金融级鉴权验签与防重放**：支持标准 HMAC-SHA256 签名校验（AK/SK 机制），结合 Nonce 随机数缓存实现高效防重放攻击。
 - **SQL AST 语法树深度解析与安全审计**：
@@ -45,6 +49,10 @@
   - 刚性拦截写指令（DROP / TRUNCATE / UPDATE / DELETE）及高危探测函数（SLEEP / BENCHMARK / 元数据跨库探测）。
 - **细粒度库表授权与 IP 黑名单管控**：支持单账号多库多表白名单配置（JSON 策略）、动态限流 QPS，并支持在调用日志中一键拉黑异常客户端 IP。
 - **调用终端与 AI 来源审计**：全链路记录 client_source、User-Agent、执行 SQL、耗时、数据行数与安全拦截状态。
+
+<p align="center">
+  <img src="doc/images/04_api_collector.png" alt="接口数据采集任务与前置签名脚本配置" width="95%" />
+</p>
 
 ### 3. 👥 动态角色权限与租户级行级隔离 (Dynamic RBAC & Tenant Isolation)
 - **系统角色字典动态管理**：扩展 job_role 元数据，支持自定义角色（如开发员、审计员、业务分析师）及动态权限分配。
@@ -56,6 +64,22 @@
 - **批量任务迁移与改库调度**：支持通过正则或字符串替换批量修改数百个任务的 Reader/Writer 连接串，支持任务批量复制与参数热插拔。
 - **任务数据量核对与跨库对账**：提供统计计算任务引擎（StatTaskEngine），自动比对源库与目标库的数据吞吐与日增量差异。
 - **支持 MCP 协议生态接入**：提供标准 Python 客户端与 MCP 工具集成，便于通过 Cursor、Trae、WorkBuddy 等 AI 工具直接安全调用数仓数据。
+
+<p align="center">
+  <img src="doc/images/02_data_compare.png" alt="源库与目标库数据量批量比对看板" width="95%" />
+</p>
+
+<p align="center">
+  <img src="doc/images/03_sync_strategy.png" alt="数据同步策略选择与回溯" width="75%" />
+</p>
+
+<p align="center">
+  <img src="doc/images/05_task_history.png" alt="任务执行历史记录与写入结果明细" width="95%" />
+</p>
+
+<p align="center">
+  <img src="doc/images/06_mcp_config.png" alt="通用 MCP 协议接入与 AI 工具自动化配置" width="85%" />
+</p>
 
 ---
 
