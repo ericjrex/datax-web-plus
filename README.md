@@ -168,6 +168,7 @@ mvn clean package -DskipTests
 
 - 感谢阿里巴巴开源的高效数据同步引擎 [Alibaba DataX](https://github.com/alibaba/DataX)。
 - 感谢 [WeiYe-Jing/datax-web](https://github.com/WeiYe-Jing/datax-web) 提供的开箱即用可视化调度基线。
+- 感谢 [LINUX DO](https://linux.do/) 社区对本项目开源推广的支持与认可。
 
 ---
 
