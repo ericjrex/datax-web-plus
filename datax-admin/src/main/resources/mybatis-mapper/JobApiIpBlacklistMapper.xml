@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wugui.datax.admin.mapper.JobApiIpBlacklistMapper">
+
+    <resultMap id="BaseResultMap" type="com.wugui.datax.admin.entity.JobApiIpBlacklist">
+        <id column="id" property="id" />
+        <result column="ip_address" property="ipAddress" />
+        <result column="app_key" property="appKey" />
+        <result column="reason" property="reason" />
+        <result column="source_log_id" property="sourceLogId" />
+        <result column="status" property="status" />
+        <result column="create_by" property="createBy" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, ip_address, app_key, reason, source_log_id, status, create_by, create_time, update_time
+    </sql>
+
+    <!-- 查询所有生效中的 IP 黑名单记录 -->
+    <select id="listActiveBlacklist" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM job_api_ip_blacklist
+        WHERE status = 1
+        ORDER BY id DESC
+    </select>
+
+    <!-- 根据 IP 地址与 AppKey 精确查询记录 -->
+    <select id="getByIpAndAppKey" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM job_api_ip_blacklist
+        WHERE ip_address = #{ipAddress}
+          AND app_key = #{appKey}
+        LIMIT 1
+    </select>
+
+</mapper>

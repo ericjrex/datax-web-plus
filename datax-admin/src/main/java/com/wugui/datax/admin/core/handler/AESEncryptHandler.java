@@ -21,9 +21,15 @@ public class AESEncryptHandler extends BaseTypeHandler<String> {
 
     @Override
     public void setNonNullParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType) throws SQLException {
-        if(StringUtils.isNotBlank(parameter)){
-            ps.setString(i, AESUtil.encrypt(parameter));
-        }else{
+        if (StringUtils.isNotBlank(parameter)) {
+            // 防重复加密判断：若已是合法密文，则不再二次加密
+            String decrypted = AESUtil.decrypt(parameter);
+            if (decrypted != null) {
+                ps.setString(i, parameter);
+            } else {
+                ps.setString(i, AESUtil.encrypt(parameter));
+            }
+        } else {
             ps.setString(i, null);
         }
     }

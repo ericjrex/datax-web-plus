@@ -240,6 +240,7 @@ public class BaseForm {
             switch (k) {
                 case "pluginName":
                 case "datasourceName":
+                case "comments":
                     queryWrapper.like(StrUtil.toUnderlineCase(k), v);
                     break;
                 default:

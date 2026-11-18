@@ -17,6 +17,9 @@ import com.wugui.datax.admin.entity.JobLog;
 import com.wugui.datax.admin.tool.query.BaseQueryTool;
 import com.wugui.datax.admin.tool.query.QueryToolFactory;
 import com.wugui.datax.admin.util.JSONUtils;
+import com.wugui.datax.admin.dto.StatTaskResultDto;
+import com.wugui.datax.admin.service.impl.JobApiTaskServiceImpl;
+import com.wugui.datax.admin.service.impl.StatTaskServiceImpl;
 import com.wugui.datax.rpc.util.IpUtil;
 import com.wugui.datax.rpc.util.ThrowableUtil;
 import org.apache.commons.lang.StringUtils;
@@ -136,7 +139,10 @@ public class JobTrigger {
         triggerParam.setLogDateTime(jobLog.getTriggerTime().getTime());
         triggerParam.setGlueType(jobInfo.getGlueType());
         triggerParam.setGlueSource(jobInfo.getGlueSource());
-        triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().getTime());
+        long glueUpdateTime = (jobInfo.getGlueUpdatetime() != null)
+                ? jobInfo.getGlueUpdatetime().getTime()
+                : (jobInfo.getUpdateTime() != null ? jobInfo.getUpdateTime().getTime() : System.currentTimeMillis());
+        triggerParam.setGlueUpdatetime(glueUpdateTime);
         triggerParam.setBroadcastIndex(index);
         triggerParam.setBroadcastTotal(total);
         triggerParam.setJobJson(jobInfo.getJobJson());
@@ -182,9 +188,52 @@ public class JobTrigger {
             routeAddressResult = new ReturnT<String>(ReturnT.FAIL_CODE, I18nUtil.getString("jobconf_trigger_address_empty"));
         }
 
-        // 4、trigger remote executor
+        // 4、trigger remote executor or local stat task
         ReturnT<String> triggerResult = null;
-        if (address != null) {
+        if (StatTaskServiceImpl.STAT_TASK_HANDLER.equals(jobInfo.getExecutorHandler())) {
+            address = "127.0.0.1(local-stat-engine)";
+            try {
+                Long taskId = Long.valueOf(jobInfo.getExecutorParam());
+                StatTaskResultDto statResult = JobAdminConfig.getAdminConfig().getStatTaskService().executeStatTask(taskId, "CRON", jobLog.getId());
+                boolean isDiscarded = (statResult != null && statResult.getMessage() != null && statResult.getMessage().contains("丢弃后续调度"));
+                if (isDiscarded) {
+                    triggerResult = new ReturnT<>(ReturnT.FAIL_CODE, statResult.getMessage());
+                    jobLog.setHandleCode(ReturnT.FAIL_CODE);
+                    jobLog.setHandleMsg(statResult.getMessage());
+                } else {
+                    triggerResult = new ReturnT<>(ReturnT.SUCCESS_CODE, statResult.getMessage() != null ? statResult.getMessage() : "统计任务执行成功");
+                    jobLog.setHandleCode(ReturnT.SUCCESS_CODE);
+                    jobLog.setHandleMsg(triggerResult.getMsg());
+                }
+                jobLog.setHandleTime(new Date());
+                JobAdminConfig.getAdminConfig().getJobLogMapper().updateHandleInfo(jobLog);
+            } catch (Exception ex) {
+                logger.error("本地调度执行统计任务失败: {}", ex.getMessage(), ex);
+                triggerResult = new ReturnT<>(ReturnT.FAIL_CODE, "统计任务执行失败: " + ex.getMessage());
+                jobLog.setHandleCode(ReturnT.FAIL_CODE);
+                jobLog.setHandleMsg(triggerResult.getMsg());
+                jobLog.setHandleTime(new Date());
+                JobAdminConfig.getAdminConfig().getJobLogMapper().updateHandleInfo(jobLog);
+            }
+        } else if (JobApiTaskServiceImpl.API_TASK_HANDLER.equals(jobInfo.getExecutorHandler())) {
+            address = "127.0.0.1(local-api-engine)";
+            try {
+                Long taskId = Long.valueOf(jobInfo.getExecutorParam());
+                String apiResultMsg = JobAdminConfig.getAdminConfig().getJobApiTaskService().executeOnce(taskId, jobLog.getId(), "CRON");
+                triggerResult = new ReturnT<>(ReturnT.SUCCESS_CODE, apiResultMsg);
+                jobLog.setHandleCode(ReturnT.SUCCESS_CODE);
+                jobLog.setHandleMsg(triggerResult.getMsg());
+                jobLog.setHandleTime(new Date());
+                JobAdminConfig.getAdminConfig().getJobLogMapper().updateHandleInfo(jobLog);
+            } catch (Exception ex) {
+                logger.error("本地调度执行接口数据采集任务失败: {}", ex.getMessage(), ex);
+                triggerResult = new ReturnT<>(ReturnT.FAIL_CODE, "接口采集任务执行失败: " + ex.getMessage());
+                jobLog.setHandleCode(ReturnT.FAIL_CODE);
+                jobLog.setHandleMsg(triggerResult.getMsg());
+                jobLog.setHandleTime(new Date());
+                JobAdminConfig.getAdminConfig().getJobLogMapper().updateHandleInfo(jobLog);
+            }
+        } else if (address != null) {
             triggerResult = runExecutor(triggerParam, address);
         } else {
             triggerResult = new ReturnT<String>(ReturnT.FAIL_CODE, null);

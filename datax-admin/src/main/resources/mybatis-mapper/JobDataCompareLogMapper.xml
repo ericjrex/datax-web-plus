@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wugui.datax.admin.mapper.JobDataCompareLogMapper">
+
+    <!-- 批量插入对账日志明细 -->
+    <insert id="insertBatch" parameterType="java.util.List" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO job_data_compare_log (
+            batch_no, job_id, job_desc, reader_datasource_id, reader_table,
+            writer_datasource_id, writer_table, source_count, target_count,
+            diff_count, status, status_msg, cost_time, create_time, create_by
+        ) VALUES
+        <foreach collection="logs" item="item" separator=",">
+            (
+                #{item.batchNo}, #{item.jobId}, #{item.jobDesc}, #{item.readerDatasourceId}, #{item.readerTable},
+                #{item.writerDatasourceId}, #{item.writerTable}, #{item.sourceCount}, #{item.targetCount},
+                #{item.diffCount}, #{item.status}, #{item.statusMsg}, #{item.costTime}, #{item.createTime}, #{item.createBy}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 获取指定任务ID集合各自最新的对账日志 -->
+    <select id="selectLatestByJobIds" resultType="com.wugui.datax.admin.entity.JobDataCompareLog">
+        SELECT a.*
+        FROM job_data_compare_log a
+        INNER JOIN (
+            SELECT job_id, MAX(id) AS max_id
+            FROM job_data_compare_log
+            WHERE job_id IN
+            <foreach collection="jobIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+            GROUP BY job_id
+        ) b ON a.id = b.max_id
+        ORDER BY a.job_id ASC
+    </select>
+
+    <!-- 根据批次号获取全量明细 -->
+    <select id="selectByBatchNo" resultType="com.wugui.datax.admin.entity.JobDataCompareLog">
+        SELECT *
+        FROM job_data_compare_log
+        WHERE batch_no = #{batchNo}
+        ORDER BY id ASC
+    </select>
+
+</mapper>

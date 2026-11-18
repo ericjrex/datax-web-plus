@@ -2,6 +2,8 @@ package com.wugui.datax.admin.core.conf;
 
 import com.wugui.datax.admin.core.scheduler.JobScheduler;
 import com.wugui.datax.admin.mapper.*;
+import com.wugui.datax.admin.service.JobApiTaskService;
+import com.wugui.datax.admin.service.StatTaskService;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,6 +71,9 @@ public class JobAdminConfig implements InitializingBean, DisposableBean {
     @Value("${datasource.aes.key}")
     private String dataSourceAESKey;
 
+    @Value("${datax.job.scheduler.enabled:true}")
+    private boolean schedulerEnabled = true;
+
     // dao, service
 
     @Resource
@@ -87,6 +92,18 @@ public class JobAdminConfig implements InitializingBean, DisposableBean {
     private DataSource dataSource;
     @Resource
     private JobDatasourceMapper jobDatasourceMapper;
+    @Resource
+    private StatTaskService statTaskService;
+    @Resource
+    private JobApiTaskService jobApiTaskService;
+
+    public StatTaskService getStatTaskService() {
+        return statTaskService;
+    }
+
+    public JobApiTaskService getJobApiTaskService() {
+        return jobApiTaskService;
+    }
 
     public String getI18n() {
         return i18n;
@@ -142,6 +159,10 @@ public class JobAdminConfig implements InitializingBean, DisposableBean {
 
     public JobDatasourceMapper getJobDatasourceMapper() {
         return jobDatasourceMapper;
+    }
+
+    public boolean isSchedulerEnabled() {
+        return schedulerEnabled;
     }
 
     public String getDataSourceAESKey() {

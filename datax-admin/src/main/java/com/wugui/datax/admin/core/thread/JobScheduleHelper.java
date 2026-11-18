@@ -292,6 +292,9 @@ public class JobScheduleHelper {
     }
 
     public void toStop() {
+        if (scheduleThread == null) {
+            return;
+        }
 
         // 1、stop schedule
         scheduleThreadToStop = true;

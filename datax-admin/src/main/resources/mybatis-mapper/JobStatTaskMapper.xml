@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wugui.datax.admin.mapper.JobStatTaskMapper">
+
+    <select id="selectStatTaskPage" resultType="com.wugui.datax.admin.entity.JobStatTask">
+        SELECT 
+            t.id,
+            t.task_name,
+            t.task_type,
+            t.job_id,
+            t.cron_expression,
+            t.status,
+            t.source_datasource_id,
+            t.is_cross_db,
+            t.target_datasource_id,
+            t.target_table_name,
+            t.auto_create_table,
+            t.write_mode,
+            t.batch_size,
+            t.timeout_seconds,
+            t.alarm_email,
+            t.executor_block_strategy,
+            t.last_run_time,
+            t.last_run_status,
+            t.last_run_msg,
+            t.create_by,
+            t.create_time,
+            t.update_by,
+            t.update_time,
+            sds.datasource_name AS source_datasource_name,
+            tds.datasource_name AS target_datasource_name
+        FROM job_stat_task t
+        LEFT JOIN job_jdbc_datasource sds ON t.source_datasource_id = sds.id
+        LEFT JOIN job_jdbc_datasource tds ON t.target_datasource_id = tds.id
+        <where>
+            <if test="taskName != null and taskName != ''">
+                AND t.task_name LIKE CONCAT('%', #{taskName}, '%')
+            </if>
+            <if test="taskType != null and taskType != ''">
+                AND t.task_type = #{taskType}
+            </if>
+            <if test="status != null">
+                AND t.status = #{status}
+            </if>
+            <if test="datasourceId != null">
+                AND (t.source_datasource_id = #{datasourceId} OR t.target_datasource_id = #{datasourceId})
+            </if>
+            <if test="tableName != null and tableName != ''">
+                AND t.target_table_name LIKE CONCAT('%', #{tableName}, '%')
+            </if>
+        </where>
+        ORDER BY t.id DESC
+    </select>
+
+</mapper>

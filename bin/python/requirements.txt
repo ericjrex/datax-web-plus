@@ -1,0 +1,5 @@
+# DataX-Web Python 统计计算任务依赖清单
+# author: ypc
+pymysql>=1.0.0
+requests>=2.25.0
+dbutils>=3.0.0

@@ -123,6 +123,9 @@
                     #{projectId}
                 </foreach>
             </if>
+			<if test="updateTime != null">
+				AND t.update_time &gt;= #{updateTime}
+			</if>
 		</trim>
 		ORDER BY id DESC
 		LIMIT #{offset}, #{pagesize}
@@ -160,6 +163,9 @@
                     #{projectId}
                 </foreach>
             </if>
+			<if test="updateTime != null">
+				AND t.update_time &gt;= #{updateTime}
+			</if>
 		</trim>
 	</select>
 

@@ -1,6 +1,9 @@
 package com.wugui.datax.admin.config;
 
+import com.wugui.datax.admin.interceptor.OpenApiSecurityInterceptor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -15,6 +18,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 public class WebConfig implements WebMvcConfigurer {
 
+
+    @Autowired
+    private OpenApiSecurityInterceptor openApiSecurityInterceptor;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(openApiSecurityInterceptor)
+                .addPathPatterns("/api/open/v1/**");
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

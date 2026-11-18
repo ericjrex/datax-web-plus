@@ -41,7 +41,12 @@ public class JobScheduler {
         JobLogReportHelper.getInstance().start();
 
         // start-schedule
-        JobScheduleHelper.getInstance().start();
+        if (JobAdminConfig.getAdminConfig().isSchedulerEnabled()) {
+            JobScheduleHelper.getInstance().start();
+            logger.info(">>>>>>>>> datax-web JobScheduleHelper started.");
+        } else {
+            logger.info(">>>>>>>>> datax-web JobScheduleHelper is disabled (datax.job.scheduler.enabled=false).");
+        }
 
         logger.info(">>>>>>>>> init datax-web admin success.");
     }
@@ -50,7 +55,9 @@ public class JobScheduler {
     public void destroy() throws Exception {
 
         // stop-schedule
-        JobScheduleHelper.getInstance().toStop();
+        if (JobAdminConfig.getAdminConfig().isSchedulerEnabled()) {
+            JobScheduleHelper.getInstance().toStop();
+        }
 
         // admin log report stop
         JobLogReportHelper.getInstance().toStop();

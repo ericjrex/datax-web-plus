@@ -2,17 +2,21 @@ package com.wugui.datax.admin.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
 import com.google.common.collect.Lists;
+import com.wugui.datax.admin.dto.TableSchemaSnapshotDto;
 import com.wugui.datax.admin.entity.JobDatasource;
 import com.wugui.datax.admin.service.DatasourceQueryService;
 import com.wugui.datax.admin.service.JobDatasourceService;
 import com.wugui.datax.admin.tool.query.*;
 import com.wugui.datax.admin.util.JdbcConstants;
+import com.wugui.datax.admin.tool.database.ColumnInfo;
+import com.wugui.datax.admin.tool.database.TableInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -111,5 +115,87 @@ public class DatasourceQueryServiceImpl implements DatasourceQueryService {
         }
         BaseQueryTool queryTool = QueryToolFactory.getByDbType(jdbcDatasource);
         return queryTool.getColumnsByQuerySql(querySql);
+    }
+
+    @Override
+    public List<ColumnInfo> getColumnsDetails(Long id, String tableName) throws IOException {
+        JobDatasource datasource = jobDatasourceService.getById(id);
+        if (ObjectUtil.isNull(datasource) || StringUtils.isBlank(tableName)) {
+            return Collections.emptyList();
+        }
+        if (JdbcConstants.HBASE.equals(datasource.getDatasource())
+                || JdbcConstants.MONGODB.equals(datasource.getDatasource())) {
+            List<String> names = getColumns(id, tableName);
+            List<ColumnInfo> result = Lists.newArrayList();
+            if (names != null) {
+                for (String name : names) {
+                    ColumnInfo col = new ColumnInfo();
+                    col.setName(name);
+                    col.setType("String");
+                    col.setIfPrimaryKey(false);
+                    col.setIsnull(1);
+                    result.add(col);
+                }
+            }
+            return result;
+        }
+        BaseQueryTool queryTool = QueryToolFactory.getByDbType(datasource);
+        return queryTool.getColumns(tableName);
+    }
+
+    @Override
+    public TableInfo getTableDetails(Long id, String tableName) throws IOException {
+        JobDatasource datasource = jobDatasourceService.getById(id);
+        if (ObjectUtil.isNull(datasource) || StringUtils.isBlank(tableName)) {
+            return null;
+        }
+        BaseQueryTool queryTool = QueryToolFactory.getByDbType(datasource);
+        try {
+            return queryTool.buildTableInfo(tableName);
+        } catch (Exception e) {
+            TableInfo tableInfo = new TableInfo();
+            tableInfo.setName(tableName);
+            tableInfo.setColumns(getColumnsDetails(id, tableName));
+            return tableInfo;
+        }
+    }
+
+    @Override
+    public boolean checkTableExists(Long id, String tableName) throws IOException {
+        if (id == null || StringUtils.isBlank(tableName)) {
+            return false;
+        }
+        List<String> tables = getTables(id, null);
+        if (tables == null || tables.isEmpty()) {
+            return false;
+        }
+        for (String t : tables) {
+            if (tableName.equalsIgnoreCase(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public TableSchemaSnapshotDto getTableSchemaSnapshot(Long id, String tableName) throws IOException {
+        JobDatasource datasource = jobDatasourceService.getById(id);
+        if (ObjectUtil.isNull(datasource) || StringUtils.isBlank(tableName)) {
+            return null;
+        }
+        String cleanTable = tableName.replace("`", "").replace("\"", "").trim();
+        String schema = null;
+        String pureTable = cleanTable;
+        int dotIdx = cleanTable.indexOf('.');
+        if (dotIdx > 0 && dotIdx < cleanTable.length() - 1) {
+            schema = cleanTable.substring(0, dotIdx).trim();
+            pureTable = cleanTable.substring(dotIdx + 1).trim();
+        }
+        try {
+            TableDataQueryTool tool = new TableDataQueryTool(datasource);
+            return tool.getSingleTableSchemaSnapshot(schema, pureTable);
+        } catch (SQLException e) {
+            throw new IOException("获取表 [" + tableName + "] 结构快照失败: " + e.getMessage(), e);
+        }
     }
 }

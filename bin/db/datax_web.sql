@@ -352,3 +352,48 @@ CHANGE COLUMN `author` `user_id` INT(11) NOT NULL COMMENT '修改用户' ;
 
 ALTER TABLE `job_info`
 CHANGE COLUMN `increment_type` `increment_type` TINYINT(4) NULL DEFAULT 0 COMMENT '增量类型' ;
+
+-- ----------------------------
+-- Records of job_permission
+-- ----------------------------
+INSERT INTO `job_permission` (`id`, `name`, `description`, `url`, `pid`)
+SELECT 10, '库表简易查询', '简易直观的库表查询与数据浏览工作台', '/datax/table-query', 0
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM `job_permission` WHERE `url` = '/datax/table-query' OR `name` = '库表简易查询'
+);
+
+-- ----------------------------
+-- Table structure for job_role_table_permission
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `job_role_table_permission` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `role_code` varchar(50) NOT NULL COMMENT '角色标识：ROLE_ADMIN, ROLE_USER, 或业务自定义角色',
+  `datasource_id` bigint(20) NOT NULL COMMENT '数据源ID (关联 job_jdbc_datasource.id)',
+  `table_names` text NOT NULL COMMENT '允许访问的表名列表(逗号分隔)，* 表示整库全表',
+  `allow_query` tinyint(1) NOT NULL DEFAULT 1 COMMENT '是否允许查看表数据：1-允许预览数据，0-仅允许查看表名与字段结构',
+  `allow_sql` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否允许在工作台执行SQL：1-允许，0-禁止使用SQL编辑器',
+  `max_query_rows` int(11) NOT NULL DEFAULT 100 COMMENT '单次查询最大返回行数限制',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_role_datasource` (`role_code`, `datasource_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色库表细粒度权限授权表';
+
+-- ----------------------------
+-- Table structure for job_role_menu_permission
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `job_role_menu_permission` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `role_code` varchar(50) NOT NULL COMMENT '角色标识：ROLE_USER 或业务自定义角色',
+  `menu_codes` text NOT NULL COMMENT '允许访问的菜单标识列表(逗号分隔)，如 dashboard,project,jobInfo,jobLog,tableQuery',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_role_code` (`role_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色系统菜单访问权限表';
+
+INSERT INTO `job_role_menu_permission` (`role_code`, `menu_codes`)
+VALUES ('ROLE_USER', 'dashboard,project,jobInfo,jobLog,tableQuery')
+ON DUPLICATE KEY UPDATE `menu_codes` = VALUES(`menu_codes`);
+

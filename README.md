@@ -1,281 +1,497 @@
-![GitHub contributors](https://img.shields.io/github/contributors/WeiYe-Jing/datax-web)
-![GitHub issues](https://img.shields.io/github/issues/WeiYe-Jing/datax-web)
-![GitHub](https://img.shields.io/github/license/WeiYe-Jing/datax-web)
-![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/WeiYe-Jing/datax-web)
-![](https://img.shields.io/badge/qq%E7%BE%A4-776939467-green.svg)
+<!--
+@author: ypc
+@description: DataX 与 DataX-Web 测试/生产环境部署、运维与反向代理操作手册
+@date: 2026-09-03
+-->
 
-# DataX-Web
+# DataX 与 DataX-Web 部署运维及反向代理操作手册
 
-[![Stargazers over time](https://starchart.cc/WeiYe-Jing/datax-web.svg)](https://starchart.cc/WeiYe-Jing/datax-web)
+本文档针对 DataX 计算引擎及 DataX-Web 可视化任务调度平台的生产与测试环境部署、运行维护、配置调整及 Nginx 网关反向代理进行全方位规范说明。
 
-DataX Web是在DataX之上开发的分布式数据同步工具，提供简单易用的
-操作界面，降低用户使用DataX的学习成本，缩短任务配置时间，避免配置过程中出错。用户可通过页面选择数据源即可创建数据同步任务，支持RDBMS、Hive、HBase、ClickHouse、MongoDB等数据源，RDBMS数据源可批量创建数据同步任务，支持实时查看数据同步进度及日志并提供终止同步功能，集成并二次开发xxl-job可根据时间、自增主键增量同步数据。
+---
 
-任务"执行器"支持集群部署，支持执行器多节点路由策略选择，支持超时控制、失败重试、失败告警、任务依赖，执行器CPU.内存.负载的监控等等。后续还将提供更多的数据源支持、数据转换UDF、表结构同步、数据同步血缘等更为复杂的业务场景。
+## 一、 系统架构与网络拓扑
 
-# Architecture diagram：
+```mermaid
+flowchart TD
+    subgraph 客户端与统一网关层
+        User[用户浏览器 / 外部客户端] -->|端口 9095| Nginx[Nginx 反向代理网关]
+    end
 
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/DataX-Web.png)
+    subgraph 前端静态应用层
+        Nginx -->|根路径 / 本地静态托管| Front[主前端静态应用 SPA<br/>/data/web/frontend_dist]
+    end
 
-# System Requirements
+    subgraph 调度与管理服务层 [部署路径: /data/datax/datax-web]
+        Nginx -->|/datax-web/ 与 /api/ 代理| Admin[DataX-Admin 调度中心<br/>modules/datax-admin:9527]
+        Nginx -.->|静态资源 @datax_static 智能降级| Admin
+        
+        Admin <-->|9999 RPC 远程触发与状态回调| Executor[DataX-Executor 任务执行器<br/>modules/datax-executor]
+        Admin <-->|元数据读写与调度持久化| DB[(MySQL 业务库 datax_web)]
+    end
 
-- Language: Java 8（jdk版本建议1.8.201以上）<br>
-  Python2.7(支持Python3需要修改替换datax/bin下面的三个python文件，替换文件在doc/datax-web/datax-python3下)
-- Environment: MacOS, Windows,Linux
-- Database: Mysql5.7
-
-
-
-# Features
-
-- 1、通过Web构建DataX Json；
-- 2、DataX Json保存在数据库中，方便任务的迁移，管理；
-- 3、Web实时查看抽取日志，类似Jenkins的日志控制台输出功能；
-- 4、DataX运行记录展示，可页面操作停止DataX作业；
-- 5、支持DataX定时任务，支持动态修改任务状态、启动/停止任务，以及终止运行中任务，即时生效；
-- 6、调度采用中心式设计，支持集群部署；
-- 7、任务分布式执行，任务"执行器"支持集群部署；
-- 8、执行器会周期性自动注册任务, 调度中心将会自动发现注册的任务并触发执行；
-- 9、路由策略：执行器集群部署时提供丰富的路由策略，包括：第一个、最后一个、轮询、随机、一致性HASH、最不经常使用、最近最久未使用、故障转移、忙碌转移等；
-- 10、阻塞处理策略：调度过于密集执行器来不及处理时的处理策略，策略包括：单机串行（默认）、丢弃后续调度、覆盖之前调度；
-- 11、任务超时控制：支持自定义任务超时时间，任务运行超时将会主动中断任务；
-- 12、任务失败重试：支持自定义任务失败重试次数，当任务失败时将会按照预设的失败重试次数主动进行重试；
-- 13、任务失败告警；默认提供邮件方式失败告警，同时预留扩展接口，可方便的扩展短信、钉钉等告警方式；
-- 14、用户管理：支持在线管理系统用户，存在管理员、普通用户两种角色；
-- 15、任务依赖：支持配置子任务依赖，当父任务执行结束且执行成功后将会主动触发一次子任务的执行, 多个子任务用逗号分隔；
-- 16、运行报表：支持实时查看运行数据，以及调度报表，如调度日期分布图，调度成功分布图等；
-- 17、指定增量字段，配置定时任务自动获取每次的数据区间，任务失败重试，保证数据安全；
-- 18、页面可配置DataX启动JVM参数；
-- 19、数据源配置成功后添加手动测试功能；
-- 20、可以对常用任务进行配置模板，在构建完JSON之后可选择关联模板创建任务；
-- 21、jdbc添加hive数据源支持，可在构建JSON页面选择数据源生成column信息并简化配置；
-- 22、优先通过环境变量获取DataX文件目录，集群部署时不用指定JSON及日志目录；
-- 23、通过动态参数配置指定hive分区，也可以配合增量实现增量数据动态插入分区；
-- 24、任务类型由原来DataX任务扩展到Shell任务、Python任务、PowerShell任务；
-- 25、添加HBase数据源支持，JSON构建可通过HBase数据源获取hbaseConfig，column；
-- 26、添加MongoDB数据源支持，用户仅需要选择collectionName即可完成json构建；
-- 27、添加执行器CPU、内存、负载的监控页面；
-- 28、添加24类插件DataX JSON配置样例
-- 29、公共字段（创建时间，创建人，修改时间，修改者）插入或更新时自动填充
-- 30、对swagger接口进行token验证
-- 31、任务增加超时时间，对超时任务kill datax进程，可配合重试策略避免网络问题导致的datax卡死。
-- 32、添加项目管理模块，可对任务分类管理；
-- 33、对RDBMS数据源增加批量任务创建功能，选择数据源，表即可根据模板批量生成DataX同步任务；
-- 34、JSON构建增加ClickHouse数据源支持；
-- 35、执行器CPU.内存.负载的监控页面图形化；
-- 36、RDBMS数据源增量抽取增加主键自增方式并优化页面参数配置；
-- 37、更换MongoDB数据源连接方式,重构HBase数据源JSON构建模块；
-- 38、脚本类型任务增加停止功能；
-- 39、rdbms json构建增加postSql，并支持构建多个preSql，postSql；
-- 40、数据源信息加密算法修改及代码优化；
-- 41、日志页面增加DataX执行结果统计数据；
-
-# Quick Start：
-
-##### 请点击：[Quick Start](https://github.com/WeiYe-Jing/datax-web/blob/master/userGuid.md)
-##### Linux：[一键部署](https://github.com/WeiYe-Jing/datax-web/blob/master/doc/datax-web/datax-web-deploy.md)
-
-
-# Introduction：
-
-### 1.执行器配置(使用开源项目xxl-job)
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/executor.png)
-
-- 1、"调度中心OnLine:"右侧显示在线的"调度中心"列表, 任务执行结束后, 将会以failover的模式进行回调调度中心通知执行结果, 避免回调的单点风险;
-- 2、"执行器列表" 中显示在线的执行器列表, 可通过"OnLine 机器"查看对应执行器的集群机器;
-
-#### 执行器属性说明
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/add_executor.png)
-
-```
-1、AppName: （与datax-executor中application.yml的datax.job.executor.appname保持一致）
-   每个执行器集群的唯一标示AppName, 执行器会周期性以AppName为对象进行自动注册。可通过该配置自动发现注册成功的执行器, 供任务调度时使用;
-2、名称: 执行器的名称, 因为AppName限制字母数字等组成,可读性不强, 名称为了提高执行器的可读性;
-3、排序: 执行器的排序, 系统中需要执行器的地方,如任务新增, 将会按照该排序读取可用的执行器列表;
-4、注册方式：调度中心获取执行器地址的方式；
-    自动注册：执行器自动进行执行器注册，调度中心通过底层注册表可以动态发现执行器机器地址；
-    手动录入：人工手动录入执行器的地址信息，多地址逗号分隔，供调度中心使用；
-5、机器地址："注册方式"为"手动录入"时有效，支持人工维护执行器的地址信息；
+    subgraph 数据同步计算层 [部署路径: /data/datax/datax]
+        Executor -->|本地 Shell 调用 python bin/datax.py| Engine[DataX 数据同步引擎<br/>/data/datax/datax]
+        Engine <-->|Reader 抽取 / Writer 写入| DataSources[(源端数据源 / 目标端数据源)]
+    end
 ```
 
-### 2.创建数据源
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/add_datasource.png)
-
-第四步使用
-
-### 3.创建任务模版
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/template_list.png)
-
-第四步使用
 
 
 
-### 4. 构建JSON脚本
+---
 
-- 1.步骤一，步骤二，选择第二步中创建的数据源，JSON构建目前支持的数据源有hive,mysql,oracle,postgresql,sqlserver,hbase,mongodb,clickhouse 其它数据源的JSON构建正在开发中,暂时需要手动编写。
+## 二、 环境访问地址与认证凭证
 
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/build.png)
+### 1. 访问地址
+* **测试环境**：
+  * **IP 访问**：`http://<测试服务器IP>:9095/datax-web/index.html`
+  * **测试域名访问**：`http://test.yourdomain.com:9095/datax-web/index.html`
+* **正式环境**：
+  * **生产域名访问**：`http://datax.yourdomain.com:9095/datax-web/index.html`
 
-- 2.字段映射
+### 2. 默认账号与密码
+* **初始账号**：admin
+* **初始密码**：123456
+* **修改后密码**：`<实际生产密码>`（首次部署登录后请立即修改）
+* **角色权限**：超级管理员（`ROLE_ADMIN`）
 
+---
 
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/mapping.png)
+## 三、 部署路径与目录规划
 
-- 3.点击构建，生成json,此时可以选择复制json然后创建任务，选择datax任务，将json粘贴到文本框。也可以点击选择模版，直接生成任务。
+| 系统组件 | 部署绝对路径 | 说明与关键子路径 |
+| :--- | :--- | :--- |
+| **DataX 引擎** | `/data/datax/datax` | 核心执行脚本：`/data/datax/datax/bin/datax.py`<br/>插件目录：`/data/datax/datax/plugin/` |
+| **DataX-Web 根目录** | `/data/datax/datax-web` | 全局脚本入口：`/data/datax/datax-web/bin/`<br/>安装包解压目录：`/data/datax/datax-web/modules/` |
+| ├─ **Admin 管理端** | `/data/datax/datax-web/modules/datax-admin` | 程序路径：`bin/datax-admin.sh`<br/>配置路径：`conf/application.yml`、`bin/env.properties`<br/>日志路径：`logs/datax-admin.log` |
+| └─ **Executor 执行器** | `/data/datax/datax-web/modules/datax-executor` | 程序路径：`bin/datax-executor.sh`<br/>配置路径：`conf/application.yml`、`bin/env.properties`<br/>日志路径：`logs/datax-executor.log` |
 
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/select_template.png)
+---
 
-### 5.批量创建任务
+## 四、 启停控制与进程运维命令
 
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/batch_build_r.png)
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/batch_build_w.png)
+### 1. 一键启停命令（推荐）
+在 `/data/datax/datax-web/bin` 目录下提供了一键控制脚本：
+```bash
+# 启动全部组件（按顺序自动拉起 Admin 与 Executor）
+/data/datax/datax-web/bin/start-all.sh
 
-### 6.任务创建介绍（关联模版创建任务不再介绍，具体参考4. 构建JSON脚本）
-
-#### 支持DataX任务,Shell任务，Python任务，PowerShell任务
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/datax.png)
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/shell.png)
-
-- 阻塞处理策略：调度过于密集执行器来不及处理时的处理策略；
-    - 单机串行：调度请求进入单机执行器后，调度请求进入FIFO队列并以串行方式运行；
-    - 丢弃后续调度：调度请求进入单机执行器后，发现执行器存在运行的调度任务，本次请求将会被丢弃并标记为失败；
-    - 覆盖之前调度：调度请求进入单机执行器后，发现执行器存在运行的调度任务，将会终止运行中的调度任务并清空队列，然后运行本地调度任务；
-- 增量增新建议将阻塞策略设置为丢弃后续调度或者单机串行
-    - 设置单机串行时应该注意合理设置重试次数(失败重试的次数*每次执行时间<任务的调度周期)，重试的次数如果设置的过多会导致数据重复，例如任务30秒执行一次，每次执行时间需要20秒，设置重试三次，如果任务失败了，第一个重试的时间段为1577755680-1577756680，重试任务没结束，新任务又开启，那新任务的时间段会是1577755680-1577758680
-
-- [增量参数设置](https://github.com/WeiYe-Jing/datax-web/blob/master/doc/datax-web/increment-desc.md)
-- [分区参数设置](https://github.com/WeiYe-Jing/datax-web/blob/master/doc/datax-web/partition-dynamic-param.md)
-
-### 7. 任务列表
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/job.png)
-
-### 8. 可以点击查看日志，实时获取日志信息,终止正在执行的datax进程
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/log_stat.png)
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/img/log_detail.png)
-
-### 9.任务资源监控
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/img/monitor.png)
-
-### 10. admin可以创建用户，编辑用户信息
-
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/user.png)
-
-
-# UI
-
-[前端github地址](https://github.com/WeiYe-Jing/datax-web-ui)
-
-# 项目成员
-
-- water
-
-```
-非常荣幸成为datax-web的Committer，从早期datax手工编写任务+配置，到datax-web界面化勾选创建任务+配置信息+调度管理，datax-web将数据同步工作的效率提升不少，相信后面后成为etl中不可或缺的生产力……
+# 停止全部组件
+/data/datax/datax-web/bin/stop-all.sh
 ```
 
-- Alecor
+### 2. 单模块精细化管理命令
+* **DataX-Admin（调度控制中心）**：
+  ```bash
+  # 启动
+  /data/datax/datax-web/modules/datax-admin/bin/datax-admin.sh start
+  
+  # 停止
+  /data/datax/datax-web/modules/datax-admin/bin/datax-admin.sh stop
+  
+  # 重启
+  /data/datax/datax-web/modules/datax-admin/bin/datax-admin.sh restart
+  
+  # 查看运行状态与 PID
+  /data/datax/datax-web/modules/datax-admin/bin/datax-admin.sh status
+  ```
 
+* **DataX-Executor（任务执行器）**：
+  ```bash
+  # 启动
+  /data/datax/datax-web/modules/datax-executor/bin/datax-executor.sh start
+  
+  # 停止
+  /data/datax/datax-web/modules/datax-executor/bin/datax-executor.sh stop
+  
+  # 重启
+  /data/datax/datax-web/modules/datax-executor/bin/datax-executor.sh restart
+  
+  # 查看运行状态与 PID
+  /data/datax/datax-web/modules/datax-executor/bin/datax-executor.sh status
+  ```
+
+---
+
+## 五、 核心配置文件与修改说明
+
+### 1. DataX-Admin 配置
+
+#### (1) `modules/datax-admin/bin/env.properties`
+```properties
+# Web 服务端口号（默认 9527）
+SERVER_PORT=9527
+
+# 日志输出目录
+WEB_LOG_PATH=${BIN}/../logs
+
+# 内部持久化数据路径
+DATA_PATH=${BIN}/../data
 ```
-非常荣幸成为datax-web的Committer，datax-web旨在帮助用户从datax配置中解放出来，提供datax的Web化的管理能力。希望datax-web能为更多有需要的人服务，带来更好的简单、易用的体验！
+
+#### (2) `modules/datax-admin/conf/application.yml`
+```yaml
+server:
+  port: 9527
+
+spring:
+  datasource:
+    # 数据库连接地址，必须确保字符集为 utf8/utf8mb4，时区对齐
+    url: jdbc:mysql://127.0.0.1:3306/datax_web?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=UTF-8&useSSL=false
+    username: root
+    password: 实际数据库密码
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 10
+      connection-timeout: 30000
 ```
 
-- zhouhongfa
+---
 
-- liukunyuan
+### 2. DataX-Executor 配置
 
-感谢贡献！
+#### (1) `modules/datax-executor/bin/env.properties`
+```properties
+# Executor Web 服务端口
+SERVER_PORT=9504
 
-# Contributing
+# 执行器与 Admin RPC 通信端口
+EXECUTOR_PORT=9999
 
-Contributions are welcome! Open a pull request to fix a bug, or open an Issue to discuss a new feature or change.
+# 对应 DataX-Admin 的端口（保持一致）
+DATAX_ADMIN_PORT=9527
 
-欢迎参与项目贡献！比如提交PR修复一个bug，或者新建 Issue 讨论新特性或者变更。
+# 【重要】DataX 核心 Python 脚本路径
+PYTHON_PATH=/data/datax/datax/bin/datax.py
+```
 
-# Copyright and License
+#### (2) `modules/datax-executor/conf/application.yml`
+```yaml
+server:
+  port: 9504
 
-MIT License
+datax:
+  job:
+    admin:
+      # 指向 DataX-Admin 调度服务
+      addresses: http://127.0.0.1:9527
+    executor:
+      appname: datax-executor
+      ip:
+      port: 9999
+      logpath: ./data/applogs/executor/jobhandler
+      logretentiondays: 30
+  # 【重要】DataX 执行入口，需与实际安装路径完全一致
+  pypath: /data/datax/datax/bin/datax.py
+```
 
-Copyright (c) 2020 WeiYe
+---
 
-产品开源免费，并且将持续提供免费的社区技术支持。个人或企业内部可自由的接入和使用。
+## 六、 详细部署说明（从零到一）
 
-> 欢迎在 [登记地址](https://github.com/WeiYe-Jing/datax-web/issues/93) 登记，登记仅仅为了产品推广和提升社区开发的动力。
+### 步骤 1：系统依赖准备
+确保服务器已安装 `Java 1.8+` 及 `Python 2.7 或 Python 3.x`：
+```bash
+java -version
+python --version
+```
 
-# v-2.1.2
+### 步骤 2：初始化 MySQL 数据库
+进入 MySQL 执行建表脚本：
+```sql
+CREATE DATABASE IF NOT EXISTS `datax_web` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `datax_web`;
 
-### 新增
+-- 1. 导入 DataX-Web 原生基础库表结构
+SOURCE /data/datax/datax-web/bin/db/datax_web.sql;
 
-1. 添加项目管理模块，可对任务分类管理；
-2. 对RDBMS数据源增加批量任务创建功能，选择数据源，表即可根据模板批量生成DataX同步任务；
-3. JSON构建增加ClickHouse数据源支持；
-4. 执行器CPU.内存.负载的监控页面图形化；
-5. RDBMS数据源增量抽取增加主键自增方式并优化页面参数配置；
-6. 更换MongoDB数据源连接方式,重构HBase数据源JSON构建模块；
-7. 脚本类型任务增加停止功能；
-8. rdbms json构建增加postSql，并支持构建多个preSql，postSql；
-9. 合并datax-registry模块到datax-rpc中；
-10.数据源信息加密算法修改及代码优化；
-11.时间增量同步支持更多时间格式；
-12.日志页面增加DataX执行结果统计数据；
+-- 2. 导入增强特性扩展表 (包含表映射模板、数据对账日志、元数据漂移审计等扩展支持)
+SOURCE /data/datax/datax-web/bin/db/datax_web_mapping_increment.sql;
 
-### 升级：
+-- 3. 导入统计计算任务扩展表与权限菜单 (可选增强模块)
+SOURCE /data/datax/datax-web/bin/db/datax_web_stat_task.sql;
+```
 
-1. PostgreSql，SQLServer，Oracle 数据源JSON构建增加schema name选择；
-2. DataX JSON中的字段名称与数据源关键词一致问题优化；
-3. 任务管理页面按钮展示优化；
-4. 日志管理页面增加任务描述信息；
-5. JSON构建前端form表单不能缓存数据问题修复;
-6. HIVE JSON构建增加头尾选项参数;
+### 步骤 3：赋予脚本执行权限
+```bash
+chmod -R +x /data/datax/datax/bin/
+chmod -R +x /data/datax/datax-web/bin/
+chmod -R +x /data/datax/datax-web/modules/datax-admin/bin/
+chmod -R +x /data/datax/datax-web/modules/datax-executor/bin/
+```
 
-### 备注：
-2.1.1版本不建议升级，数据源信息加密方式变更会导致之前已加密的数据源解密失败，任务运行失败。
-如果需要升级请重建数据源，任务。
+### 步骤 4：启动与验证
+```bash
+# 启动所有模块
+/data/datax/datax-web/bin/start-all.sh
 
-# v-2.1.1
+# 查看端口监听情况（9527 与 9504 应处于 LISTEN 状态）
+netstat -tulnp | grep -E '9527|9504|9999'
+```
 
-### 新增
+---
 
-1. 添加HBase数据源支持，JSON构建可通过HBase数据源获取hbaseConfig，column；
-2. 添加MongoDB数据源支持，用户仅需要选择collectionName即可完成json构建；
-3. 添加执行器CPU.内存.负载的监控页面；
-4. 添加24类插件DataX JSON配置样例
-5. 公共字段（创建时间，创建人，修改时间，修改者）插入或更新时自动填充
-6. 对swagger接口进行token验证
-7. 任务增加超时时间，对超时任务kill datax进程，可配合重试策略避免网络问题导致的datax卡死。
+## 七、 日志查看与故障排查命令
 
-### 升级：
+```bash
+# 1. 实时跟踪 DataX-Admin 业务运行日志
+tail -f -n 100 /data/datax/datax-web/modules/datax-admin/logs/datax-admin.log
 
-1. 数据源管理对用户名和密码进行加密，提高安全性；
-2. 对JSON文件中的用户名密码进行加密，执行DataX任务时解密
-3. 对页面菜单整理，图标升级，提示信息等交互优化；
-4. 日志输出取消项目类名等无关信息，减小文件大小，优化大文件输出，优化页面展示；
-5. logback为从yml中获取日志路径配置
+# 2. 查看 DataX-Admin 启动控制台输出 (排查 JVM 启动崩溃、数据库连接失败)
+tail -f -n 100 /data/datax/datax-web/modules/datax-admin/bin/console.out
 
-### 修复：
+# 3. 实时跟踪 DataX-Executor 任务执行器日志
+tail -f -n 100 /data/datax/datax-web/modules/datax-executor/logs/datax-executor.log
 
-1. 任务日志过大时，查看日志报错，请求超时；
+# 4. 查看具体 DataX 任务的底层运行日志 (同步行数、吞吐速度、脏数据详情)
+tail -f /data/datax/datax-web/modules/datax-executor/data/applogs/executor/jobhandler/*/*.log
 
-# 提交代码
-[参与贡献](https://github.com/WeiYe-Jing/datax-web/issues/190)
+# 5. 查看 Nginx 反向代理访问日志与错误排查日志
+tail -f /opt/nginx-1.24.0/logs/error.log
+tail -f /opt/nginx-1.24.0/logs/access.log
+```
 
+---
 
-# Contact us
+## 八、 生产就绪的 Nginx 配置文件 (适配前端静态应用与 DataX-Web 前端共存)
 
-### 个人微信
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/WechatIMG2.jpeg?x-oss-process=image/resize,w_230,h_230)
+```bash
+cd /opt/nginx-1.24.0
+vi conf/nginx.conf
 
-### QQ交流群
-![](https://datax-web.oss-cn-hangzhou.aliyuncs.com/doc/qrcode3.jpeg?x-oss-process=image/resize,w_250,h_300)
+# 语法检测与平滑重启
+./sbin/nginx -t
+./sbin/nginx -s reload
+```
 
+### 架构设计与核心问题解决方案说明
+此配置专门用于在 **同一端口/统一网关（如 9095）下实现独立前端静态应用（SPA）与 DataX-Web 前端管理平台双应用并存**，解决了以下关键问题：
+1. **双前端 `/static/` 静态资源智能分流与优雅降级**：
+   * 主前端静态应用与 DataX-Web 前端均包含静态资源路径（`/static/`）；
+   * 采用 `try_files $uri @datax_static;` 机制：优先从本地磁盘读取主前端静态构建文件，当遇到 DataX-Web 自身的前端资源（如 `element-icons.woff` 字体、专属 CSS/JS）本地不存在时，无缝透明代理回源至 DataX-Web 内部服务（`127.0.0.1:9527`），彻底根治静态资源冲突与白屏问题；
+2. **路由前缀平滑剥离**：子路径 `/datax-web/` 通过 `rewrite ^/datax-web/(.*)$ /$1 break;` 自动剥离前缀，无缝对齐 DataX-Admin 根路径映射；
+3. **接口智能拦截与鉴权转发**：拦截前端硬编码发起的绝对路径 `/api/*` 请求并反代回源；
+4. **Cookie 作用域隔离**：通过 `proxy_cookie_path / /datax-web/;` 重写作用域，保障 Token/Session 彼此隔离互不干扰。
 
+```nginx
+server {
+    listen      9095;
+    server_name 127.0.0.1 <服务器IP> <你的业务域名>;
+
+    # ==================== 1. 主前端独立静态单页应用 (根路径 /) ====================
+    location / {
+        root   /data/web/frontend_dist;    # 主前端静态构建产物路径 (如 Vue/React dist 目录)
+        try_files $uri $uri/ /index.html;  # 支持前端路由 History 模式
+        index  index.html index.htm;
+    }
+
+    # ==================== 2. DataX-Web 前端与管理服务代理 (/datax-web/) ====================
+    
+    # 2.1 补全末尾斜杠，避免被根路径 location / 误匹配
+    location = /datax-web {
+        return 301 $scheme://$http_host/datax-web/;
+    }
+
+    # 2.2 DataX-Web 前端主入口 (剥离 /datax-web/ 前缀代理至 9527 根路径)
+    location /datax-web/ {
+        rewrite ^/datax-web/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:9527;
+
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 核心：重写 Cookie 作用域，防止 Token/Session 跨应用污染
+        proxy_cookie_path / /datax-web/;
+
+        # 支持 WebSocket 与长连接大文件传输
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        client_max_body_size 2g;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    # 2.3 DataX-Web 后端 API 接口反代 (拦截前端发起的 /api/* 请求)
+    location /api/ {
+        proxy_pass http://127.0.0.1:9527/api/;
+
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_cookie_path / /datax-web/;
+
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    # 2.4 双前端静态资源智能分流 (主前端本地静态优先，未命中则降级代理给 DataX-Web 前端)
+    # 核心机制：本地磁盘优先响应主前端静态文件；遇 DataX-Web 自身资源或字体 (element-icons 等) 自动回源至 9527
+    location /static/ {
+        root /data/web/frontend_dist;     # 主前端静态构建产物路径
+        try_files $uri @datax_static;     # 本地未命中则回源代理
+    }
+
+    location @datax_static {
+        proxy_pass http://127.0.0.1:9527; # 代理回源至 DataX-Web 前端资源
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+    }
+
+    # ==================== 3. 通用错误页与 Favicon ====================
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   html;
+    }
+
+    location /favicon.ico {
+        root html;
+    }
+}
+```
+
+---
+
+## 九、 业务代码与前端更新发版规范 (标准化 Install 部署指南)
+
+### 1. 发版机制重要原则与安全红线
+
+> [!CAUTION]
+> **【安全红线】严禁使用任何形式的散文件覆盖或局部热更！**
+> 1. **严禁只替换 `datax-admin-2.1.2.jar`**：`pom.xml` 中明确将 SQL Mapper XML 排除在 Jar 包外，只换 Jar 包会导致 SQL 逻辑完全不生效。
+> 2. **严禁在根目录下解压或手动放置散文件**：Spring Boot 内置 Tomcat 启动时会自动扫描工作目录，手动创建 `static` 等目录会导致 Tomcat 报 `The main resource set specified is not valid` 致命异常导致服务彻底崩溃。
+> 3. **唯一标准更新路径**：**必须通过重新 `mvn install` 打包生成完整部署包 `datax-admin_2.1.2_1.tar.gz`，复制到 `packages/` 目录，备份移走原 `modules/datax-admin`，最后通过 `/data/datax/datax-web/bin/install.sh` 进行标准解压安装！**
+
+---
+
+### 2. 标准化发版操作流程 (SOP)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as 开发者 / 运维人员
+    participant Local as 本地构建环境 (Maven)
+    participant PkgDir as 服务器 packages 目录<br/>(/data/datax/datax-web/packages)
+    participant ModDir as 服务器 modules 目录<br/>(/data/datax/datax-web/modules)
+    participant Backup as 备份目录<br/>(/data/datax/backup_*)
+    participant Script as 安装脚本 (install.sh)
+    participant Admin as DataX-Admin 服务进程
+
+    Note over Dev,Local: 步骤 1：本地重新编译并 install
+    Dev->>Local: mvn clean install -DskipTests
+    Local-->>Dev: 输出 packages/datax-admin_2.1.2_1.tar.gz
+
+    Note over Dev,PkgDir: 步骤 2：上传/单独复制部署包
+    Dev->>PkgDir: 复制 datax-admin_2.1.2_1.tar.gz
+
+    Note over Dev,Admin: 步骤 3：停止运行并完整备份原模块
+    Dev->>Admin: datax-admin.sh stop
+    Dev->>Backup: mv modules/datax-admin backup_datax-admin_$(date)
+
+    Note over Dev,Script: 步骤 4：执行标准安装脚本
+    Dev->>Script: 执行 /data/datax/datax-web/bin/install.sh
+    Script->>ModDir: 干净解压至 modules/datax-admin 并初始化配置
+    Script-->>Dev: 安装完成
+
+    Note over Dev,Admin: 步骤 5 & 6：配置核对与启动验证
+    Dev->>Admin: datax-admin.sh start
+    Admin-->>Dev: Started DataXAdminApplication 启动成功
+```
+
+---
+
+#### 步骤 1：本地构建机重新编译打出完整安装包
+在工程根目录下执行 Maven 安装打包命令（必须包含 `install` 生命周期，触发 `maven-assembly-plugin` 组装）：
+```bash
+mvn clean install -DskipTests
+```
+* 构建成功后，会在项目根目录的 `packages/` 目录下生成完整的安装包：
+  * **部署包文件**：`packages/datax-admin_2.1.2_1.tar.gz`
+  * （该包内已完整集成了后端的 `lib/*.jar`、外部化配置 `conf/`、前端静态资源 `conf/static/`、Mapper 文件 `conf/mybatis-mapper/` 及控制脚本 `bin/`）。
+
+---
+
+#### 步骤 2：单独复制部署包到服务器 `packages` 目录
+将本地打包生成的 `datax-admin_2.1.2_1.tar.gz` 单独上传或拷贝到服务器对应目录：
+```bash
+# 复制到服务器指定 packages 目录
+# 目标路径必须为：/data/datax/datax-web/packages/
+ls -lh /data/datax/datax-web/packages/datax-admin_2.1.2_1.tar.gz
+```
+
+---
+
+#### 步骤 3：停止现有服务并完整备份原 `datax-admin` 模块
+
+> [!IMPORTANT]
+> **必须将原有的 `datax-admin` 移走备份，不可直接就地覆盖！**
+> 原因：`/data/datax/datax-web/bin/install.sh` 中的解压命令使用了 `--skip-old-files` 参数，如果目标目录下已有同名旧文件，解压时会自动跳过，导致新文件无法替换旧文件。移走旧目录能保证全新、纯净安装。
+
+在服务器终端执行：
+```bash
+# 1. 停止运行中的 DataX-Admin 服务
+/data/datax/datax-web/modules/datax-admin/bin/datax-admin.sh stop
+
+# 2. 创建备份目录
+BACKUP_DIR="/data/datax/backup_datax-admin_$(date +%Y%m%d_%H%M%S)"
+mkdir -p ${BACKUP_DIR}
+
+# 3. 将原有的整个 datax-admin 模块完整移动备份（注意是 mv 移走）
+mv /data/datax/datax-web/modules/datax-admin ${BACKUP_DIR}/
+```
+
+---
+
+#### 步骤 4：执行标准安装脚本 `install.sh`
+执行 DataX-Web 官方标准安装脚本完成解包与模块部署：
+```bash
+/data/datax/datax-web/bin/install.sh
+```
+* 交互式提示说明：
+  * 当脚本提示：`Do you want to decompress this package: [datax-admin_2.1.2_1.tar.gz]? (Y/N)` 时，输入 `Y` 回车。
+  * 若服务器仅需更新 Admin 模块，对 executor 的提示按需选择（若无需更新输入 `N` 即可）。
+  * 脚本会自动将最新的 `datax-admin_2.1.2_1.tar.gz` 解压至 `/data/datax/datax-web/modules/datax-admin`。
+
+---
+
+#### 步骤 5：环境配置文件核对与按需合并
+因为重新安装会释放出源码中的默认配置文件，需核对并恢复生产/测试环境差异化配置（如数据库连接密码等）：
+```bash
+# 检查对比 application.yml 差异
+diff ${BACKUP_DIR}/datax-admin/conf/application.yml /data/datax/datax-web/modules/datax-admin/conf/application.yml
+
+# 若有特定配置需要恢复，可直接将备份的配置合并或单文件还原
+# cp -f ${BACKUP_DIR}/datax-admin/conf/application.yml /data/datax/datax-web/modules/datax-admin/conf/application.yml
+```
+
+---
+
+#### 步骤 6：启动服务并验证运行状态
+```bash
+# 1. 启动 DataX-Admin
+/data/datax/datax-web/modules/datax-admin/bin/datax-admin.sh start
+
+# 2. 查看运行状态确认 PID
+/data/datax/datax-web/modules/datax-admin/bin/datax-admin.sh status
+
+# 3. 跟踪控制台启动日志，确认 Spring Boot 顺利拉起
+tail -f -n 50 /data/datax/datax-web/modules/datax-admin/bin/console.out
+```
+
+---
+
+#### 步骤 7：客户端强刷验证
+* 前端代码更新后，浏览器端可能存在旧版静态资源缓存，请在浏览器中按 **`Ctrl + F5`**（Mac 电脑 `Cmd + Shift + R`）强制刷新。
+* 登录控制台 `http://<服务器IP或域名>:9095/datax-web/index.html` 验证最新功能与页面交互。
 
 

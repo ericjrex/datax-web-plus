@@ -1,7 +1,10 @@
 server:
-  #port: 8080
-  port: ${server.port}
+  port: 18080
+  #port: ${server.port}
 spring:
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
   #数据源
   datasource:
     #    username: root
@@ -30,10 +33,10 @@ spring:
   mail:
     host: smtp.qq.com
     port: 25
-    #username: xxx@qq.com
-    #password: xxx
-    username: ${mail.username}
-    password: ${mail.password}
+    username: xxx@qq.com
+    password: xxx
+#    username: ${mail.username}
+#    password: ${mail.password}
     properties:
       mail:
         smtp:
@@ -96,6 +99,9 @@ logging:
 datax:
   job:
     accessToken:
+    # 调度器开关：是否启动后台定时扫描线程（默认 true。本地/开发环境设为 false 关闭定时调度，避免多环境抢锁重复执行；手动触发不受影响）
+    scheduler:
+      enabled: ${DATAX_JOB_SCHEDULER_ENABLED:true}
     #i18n (default empty as chinese, "en" as english)
     i18n:
     ## triggerpool max size
@@ -110,3 +116,8 @@ datax:
 datasource:
   aes:
     key: AD42F6697B035B75
+
+# 统计计算任务模块配置
+stat-task:
+  python:
+    path: ${STAT_PYTHON_PATH:python}

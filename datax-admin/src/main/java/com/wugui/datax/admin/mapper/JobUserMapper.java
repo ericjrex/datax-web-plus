@@ -36,6 +36,18 @@ public interface JobUserMapper {
 
     int delete(@Param("id") int id);
 
+    List<JobUser> findByRole(@Param("role") String role);
 
+    int updateUserRole(@Param("id") int id, @Param("role") String role);
+
+    /**
+     * 将指定角色的所有用户批量更新重置为新角色（用于角色删除后重置用户）
+     *
+     * @param oldRole 旧角色编码
+     * @param newRole 新角色编码
+     * @return 影响行数
+     */
+    int resetUserRoleByRole(@Param("oldRole") String oldRole, @Param("newRole") String newRole);
 
 }
+

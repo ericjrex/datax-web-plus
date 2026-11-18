@@ -12,6 +12,7 @@ import com.wugui.datax.admin.entity.JobInfo;
 import com.wugui.datax.admin.entity.JobTemplate;
 import com.wugui.datax.admin.mapper.*;
 import com.wugui.datax.admin.service.JobTemplateService;
+import com.wugui.datax.admin.util.JSONUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -120,6 +121,9 @@ public class JobTemplateServiceImpl implements JobTemplateService {
 
         // add in db
         jobTemplate.setAddTime(new Date());
+        if (GlueTypeEnum.BEAN.getDesc().equals(jobTemplate.getGlueType()) && StringUtils.isNotBlank(jobTemplate.getJobJson())) {
+            jobTemplate.setJobJson(JSONUtils.encryptJobJson(jobTemplate.getJobJson()));
+        }
         jobTemplate.setUpdateTime(new Date());
         jobTemplate.setGlueUpdatetime(new Date());
         jobTemplateMapper.save(jobTemplate);
@@ -213,7 +217,11 @@ public class JobTemplateServiceImpl implements JobTemplateService {
         exists_jobTemplate.setExecutorFailRetryCount(jobTemplate.getExecutorFailRetryCount());
         exists_jobTemplate.setChildJobId(jobTemplate.getChildJobId());
         exists_jobTemplate.setTriggerNextTime(nextTriggerTime);
-        exists_jobTemplate.setJobJson(jobTemplate.getJobJson());
+        if (GlueTypeEnum.BEAN.getDesc().equals(jobTemplate.getGlueType()) && StringUtils.isNotBlank(jobTemplate.getJobJson())) {
+            exists_jobTemplate.setJobJson(JSONUtils.encryptJobJson(jobTemplate.getJobJson()));
+        } else {
+            exists_jobTemplate.setJobJson(jobTemplate.getJobJson());
+        }
         exists_jobTemplate.setJvmParam(jobTemplate.getJvmParam());
         exists_jobTemplate.setProjectId(jobTemplate.getProjectId());
         exists_jobTemplate.setUpdateTime(new Date());

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wugui.datax.admin.mapper.JobRoleTablePermissionMapper">
+
+    <resultMap id="BaseResultMap" type="com.wugui.datax.admin.entity.JobRoleTablePermission">
+        <id column="id" property="id" />
+        <result column="role_code" property="roleCode" />
+        <result column="datasource_id" property="datasourceId" />
+        <result column="table_names" property="tableNames" />
+        <result column="allow_query" property="allowQuery" />
+        <result column="allow_sql" property="allowSql" />
+        <result column="max_query_rows" property="maxQueryRows" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, role_code, datasource_id, table_names, allow_query, allow_sql, max_query_rows, create_time, update_time
+    </sql>
+
+    <select id="getByRoleAndDatasource" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM job_role_table_permission
+        WHERE role_code = #{roleCode} AND datasource_id = #{datasourceId}
+        LIMIT 1
+    </select>
+
+    <select id="listByRoleCode" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM job_role_table_permission
+        WHERE role_code = #{roleCode}
+        ORDER BY id DESC
+    </select>
+
+    <select id="listAllPermissions" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM job_role_table_permission
+        ORDER BY role_code ASC, datasource_id ASC
+    </select>
+
+</mapper>

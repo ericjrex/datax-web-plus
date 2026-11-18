@@ -23,7 +23,19 @@ public interface JobInfoMapper {
                            @Param("jobDesc") String jobDesc,
                            @Param("glueType") String glueType,
                            @Param("userId") int userId,
-                           @Param("projectIds") Integer[] projectIds);
+                           @Param("projectIds") Integer[] projectIds,
+                           @Param("updateTime") Date updateTime);
+
+    default List<JobInfo> pageList(int offset,
+                                   int pagesize,
+                                   int jobGroup,
+                                   int triggerStatus,
+                                   String jobDesc,
+                                   String glueType,
+                                   int userId,
+                                   Integer[] projectIds) {
+        return pageList(offset, pagesize, jobGroup, triggerStatus, jobDesc, glueType, userId, projectIds, null);
+    }
 
     int pageListCount(@Param("offset") int offset,
                       @Param("pagesize") int pagesize,
@@ -32,7 +44,19 @@ public interface JobInfoMapper {
                       @Param("jobDesc") String jobDesc,
                       @Param("glueType") String glueType,
                       @Param("userId") int userId,
-                      @Param("projectIds") Integer[] projectIds);
+                      @Param("projectIds") Integer[] projectIds,
+                      @Param("updateTime") Date updateTime);
+
+    default int pageListCount(int offset,
+                              int pagesize,
+                              int jobGroup,
+                              int triggerStatus,
+                              String jobDesc,
+                              String glueType,
+                              int userId,
+                              Integer[] projectIds) {
+        return pageListCount(offset, pagesize, jobGroup, triggerStatus, jobDesc, glueType, userId, projectIds, null);
+    }
 
     List<JobInfo> findAll();
 

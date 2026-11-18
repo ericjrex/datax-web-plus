@@ -62,24 +62,43 @@
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>2.2.1</version>
                 <executions>
+                    <!-- 打包至 packages 目录，保持对历史部署脚本及总包打包依赖的兼容 -->
                     <execution>
-                        <id>assemble</id>
+                        <id>assemble-packages</id>
                         <goals>
                             <goal>single</goal>
                         </goals>
-                        <!-- install -->
+                        <!-- install 阶段执行 -->
                         <phase>install</phase>
+                        <configuration>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <attach>false</attach>
+                            <descriptors>
+                                <descriptor>${basedir}/src/main/assembly/deploy.xml</descriptor>
+                            </descriptors>
+                            <finalName>${project.artifactId}_${project.version}_1</finalName>
+                            <outputDirectory>${project.parent.basedir}/packages</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <!-- 单独打包至 build 目录，方便后续运维单个复制并更新 executor 模块 -->
+                    <execution>
+                        <id>assemble-build</id>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <!-- install 阶段执行 -->
+                        <phase>install</phase>
+                        <configuration>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <attach>false</attach>
+                            <descriptors>
+                                <descriptor>${basedir}/src/main/assembly/deploy.xml</descriptor>
+                            </descriptors>
+                            <finalName>${project.artifactId}_${project.version}_1</finalName>
+                            <outputDirectory>${project.parent.basedir}/build</outputDirectory>
+                        </configuration>
                     </execution>
                 </executions>
-                <configuration>
-                    <appendAssemblyId>false</appendAssemblyId>
-                    <attach>false</attach>
-                    <descriptors>
-                        <descriptor>${basedir}/src/main/assembly/deploy.xml</descriptor>
-                    </descriptors>
-                    <finalName>${project.artifactId}_${project.version}_1</finalName>
-                    <outputDirectory>${project.parent.basedir}/packages</outputDirectory>
-                </configuration>
             </plugin>
         </plugins>
     </build>

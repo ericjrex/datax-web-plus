@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wugui.datax.admin.mapper.JobApiAccountMapper">
+
+    <resultMap id="BaseResultMap" type="com.wugui.datax.admin.entity.JobApiAccount">
+        <id column="id" property="id" />
+        <result column="app_key" property="appKey" />
+        <result column="app_secret" property="appSecret" />
+        <result column="account_name" property="accountName" />
+        <result column="domain_code" property="domainCode" />
+        <result column="datasource_id" property="datasourceId" />
+        <result column="allowed_tables" property="allowedTables" />
+        <result column="permissions" property="permissions" />
+        <result column="allowed_ips" property="allowedIps" />
+        <result column="rate_limit_qps" property="rateLimitQps" />
+        <result column="status" property="status" />
+        <result column="comments" property="comments" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, app_key, app_secret, account_name, domain_code, datasource_id,
+        allowed_tables, permissions, allowed_ips, rate_limit_qps, status, comments, create_time, update_time
+    </sql>
+
+    <!-- 根据 AppKey 精确查询账号实体 -->
+    <select id="getByAppKey" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM job_api_account
+        WHERE app_key = #{appKey}
+        LIMIT 1
+    </select>
+
+</mapper>

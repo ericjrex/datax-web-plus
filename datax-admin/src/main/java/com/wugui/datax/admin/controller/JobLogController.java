@@ -74,6 +74,11 @@ public class JobLogController {
     @ApiOperation("运行日志详情")
     public ReturnT<LogResult> logDetailCat(String executorAddress, long triggerTime, long logId, int fromLineNum) {
         try {
+            // 本地任务兜底判断 (例如 local-stat-engine, local-api-engine 或未走远程 RPC 执行器的场景)
+            if (executorAddress != null && (executorAddress.contains("local-") || !executorAddress.contains(":"))) {
+                return buildLocalJobLogResult(logId, fromLineNum);
+            }
+
             ExecutorBiz executorBiz = JobScheduler.getExecutorBiz(executorAddress);
             ReturnT<LogResult> logResult = executorBiz.log(triggerTime, logId, fromLineNum);
 
@@ -87,9 +92,41 @@ public class JobLogController {
 
             return logResult;
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-            return new ReturnT<>(ReturnT.FAIL_CODE, e.getMessage());
+            logger.warn("远程获取日志失败，尝试从本地流水记录兜底展示 [logId: {}]: {}", logId, e.getMessage());
+            return buildLocalJobLogResult(logId, fromLineNum);
         }
+    }
+
+    /**
+     * 为本地计算引擎任务（或离线任务）组装纯文本日志视图
+     */
+    private ReturnT<LogResult> buildLocalJobLogResult(long logId, int fromLineNum) {
+        JobLog jobLog = jobLogMapper.load(logId);
+        if (jobLog == null) {
+            return new ReturnT<>(ReturnT.FAIL_CODE, "未找到日志记录 [logId: " + logId + "]");
+        }
+
+        StringBuilder sb = new StringBuilder();
+        if (jobLog.getTriggerMsg() != null) {
+            sb.append(jobLog.getTriggerMsg().replace("<br>", "\n")).append("\n");
+        }
+        sb.append("----------------- 本地引擎执行结果 -----------------\n");
+        if (jobLog.getHandleMsg() != null) {
+            sb.append(jobLog.getHandleMsg()).append("\n");
+        } else {
+            sb.append(jobLog.getHandleCode() == 0 ? "任务正在本地计算引擎执行中，请稍候...\n" : "无更多输出信息\n");
+        }
+
+        String content = sb.toString();
+        String[] lines = content.split("\n");
+        int totalLines = lines.length;
+        boolean isEnd = (jobLog.getHandleCode() > 0);
+
+        if (fromLineNum > totalLines) {
+            return new ReturnT<>(new LogResult(fromLineNum, fromLineNum, "", isEnd));
+        }
+
+        return new ReturnT<>(new LogResult(1, totalLines, content, isEnd));
     }
 
     @RequestMapping(value = "/logKill", method = RequestMethod.POST)

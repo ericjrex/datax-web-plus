@@ -48,7 +48,12 @@ public class ExecutorJobHandler extends IJobHandler {
         String tmpFilePath;
         LogStatistics logStatistics = null;
         //Generate JSON temporary file
-        tmpFilePath = generateTemJsonFile(trigger.getJobJson());
+        try {
+            tmpFilePath = generateTemJsonFile(trigger.getJobJson());
+        } catch (Exception e) {
+            JobLogger.log("生成 DataX 临时配置文件失败：" + e.getMessage());
+            return new ReturnT<>(IJobHandler.FAIL.getCode(), "生成 DataX 作业配置临时文件失败: " + e.getMessage());
+        }
 
         try {
             String[] cmdarrayFinal = buildDataXExecutorCmd(trigger, tmpFilePath,dataXPyPath);
@@ -99,23 +104,34 @@ public class ExecutorJobHandler extends IJobHandler {
 
 
 
-    private String generateTemJsonFile(String jobJson) {
-        String tmpFilePath;
+    /**
+     * 生成 DataX 作业配置临时文件并返回其标准绝对路径
+     *
+     * @param jobJson 作业 JSON 配置文本
+     * @return 临时配置文件的绝对路径
+     * @throws IOException 当文件写入或目录创建失败时抛出
+     */
+    private String generateTemJsonFile(String jobJson) throws IOException {
+        if (StringUtils.isBlank(jobJson)) {
+            throw new IllegalArgumentException("DataX 任务配置内容 (jobJson) 为空，无法生成临时配置文件！");
+        }
+
         String dataXHomePath = SystemUtils.getDataXHomePath();
-        if (StringUtils.isNotEmpty(dataXHomePath)) {
-            jsonPath = dataXHomePath + DEFAULT_JSON;
+        String targetDir = StringUtils.isNotEmpty(dataXHomePath) ? (dataXHomePath + DEFAULT_JSON) : jsonPath;
+
+        // 统一转换为标准绝对路径目录，确保父目录结构完整创建
+        File dir = new File(targetDir).getAbsoluteFile();
+        if (!dir.exists() && !dir.mkdirs()) {
+            if (!dir.exists()) {
+                throw new IOException("无法创建 DataX 临时配置文件存储目录: " + dir.getAbsolutePath());
+            }
         }
-        if (!FileUtil.exist(jsonPath)) {
-            FileUtil.mkdir(jsonPath);
-        }
-        tmpFilePath = jsonPath + "jobTmp-" + IdUtil.simpleUUID() + ".conf";
-        // 根据json写入到临时本地文件
-        try (PrintWriter writer = new PrintWriter(tmpFilePath, "UTF-8")) {
-            writer.println(jobJson);
-        } catch (FileNotFoundException | UnsupportedEncodingException e) {
-            JobLogger.log("JSON 临时文件写入异常：" + e.getMessage());
-        }
-        return tmpFilePath;
+
+        // 使用安全无歧义的文件对象拼接绝对路径
+        File tmpFile = new File(dir, "jobTmp-" + IdUtil.simpleUUID() + ".conf");
+        // 使用 Hutool 标准写出 UTF-8 文件内容
+        FileUtil.writeUtf8String(jobJson, tmpFile);
+        return tmpFile.getAbsolutePath();
     }
 
 }

@@ -18,3 +18,31 @@
 /build/
 /packages/
 /datax-assembly/target/
+/.vscode/
+/.agents/workflows/
+
+# Python 字节码缓存 (无需提交)
+__pycache__/
+*.py[cod]
+*.class
+
+# 敏感配置文件与凭据
+/bin/config/
+/scripts/
+
+# 定制业务设计文档与梳理表格
+/bin/other/
+/doc/*.xlsx
+
+# 专用业务表 DDL 与数据清洗脚本
+/bin/db/beidou_*.sql
+/bin/db/jiapei_*.sql
+/bin/db/patch_*.sql
+/bin/python/北斗-*.py
+/bin/python/generate_parking_test_data.py
+/bin/python/stat_task_template_demo.py
+/bin/python/test_delete_where_demo.py
+/doc/智能助手操作手册/
+
+# 智能助手业务截图与定制手册
+/doc/智能助手操作手册/

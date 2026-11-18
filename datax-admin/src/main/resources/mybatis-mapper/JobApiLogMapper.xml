@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wugui.datax.admin.mapper.JobApiLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.wugui.datax.admin.entity.JobApiLog">
+        <id column="id" property="id" />
+        <result column="app_key" property="appKey" />
+        <result column="client_ip" property="clientIp" />
+        <result column="domain_code" property="domainCode" />
+        <result column="execute_sql" property="executeSql" />
+        <result column="tables_involved" property="tablesInvolved" />
+        <result column="result_rows" property="resultRows" />
+        <result column="cost_ms" property="costMs" />
+        <result column="status" property="status" />
+        <result column="error_msg" property="errorMsg" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, app_key, client_ip, domain_code, execute_sql, tables_involved,
+        result_rows, cost_ms, status, error_msg, create_time
+    </sql>
+
+</mapper>
