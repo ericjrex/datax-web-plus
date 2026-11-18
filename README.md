@@ -61,7 +61,7 @@
 
 ## 🏗️ 架构拓扑 / Architecture
 
-`mermaid
+```mermaid
 flowchart TD
     subgraph 客户端与接入层
         WebUser[Web 浏览器 / 管理员]
@@ -96,13 +96,13 @@ flowchart TD
     Admin <-->|读写调度元数据| MetaDB
     Executor -->|调度启动| Engine
     Engine -->|数据抽取与写入| Sources & Targets
-`
+```
 
 ---
 
 ## 📂 项目结构 / Project Structure
 
-`	ext
+```text
 datax-web-plus/
 ├── bin/                        # 运维、自动化部署与数据库初始化脚本
 │   ├── db/                     # 核心数据库脚本 (datax_web.sql, datax_web_stat_task.sql)
@@ -117,7 +117,7 @@ datax-web-plus/
 └── doc/                        # 技术规范与详细文档
     ├── datax-web/              # 部署手册 (deploy-guide.md) 与系统配置说明
     └── openspec/               # 各特性模块的设计规范与演化提案
-`
+```
 
 ---
 
@@ -131,25 +131,25 @@ datax-web-plus/
 
 ### 2. 初始化数据库
 在 MySQL 中执行初始化脚本：
-`ash
+```bash
 mysql -u root -p < bin/db/datax_web.sql
 mysql -u root -p < bin/db/datax_web_stat_task.sql
-`
+```
 
 ### 3. 配置数据库连接
 修改 datax-admin/src/main/resources/bootstrap.properties 中的数据库配置（支持通过系统环境变量覆盖）：
-`properties
+```properties
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USERNAME=root
 DB_PASSWORD=your_password
 DB_DATABASE=datax_web
-`
+```
 
 ### 4. 编译与打包
-`ash
+```bash
 mvn clean package -DskipTests
-`
+```
 
 ### 5. 详细部署与生产运维手册
 关于 Nginx 反向代理配置、启停脚本、跨环境迁移与发版运维，请参阅：  
