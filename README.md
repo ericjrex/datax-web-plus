@@ -25,9 +25,10 @@
 
 本项目针对上述实际痛点，在保持原调度内核稳定的前提下，深度研发了：
 1. **Schema 漂移自适应演进引擎**（8 库对比、DDL 批量评审、字段注释演进）；
-2. **数仓 OpenAPI 安全网关**（HMAC-SHA256 签名、防重放攻击、SQL AST 语法树安全解析、库表白名单与 IP 现场封禁）；
-3. **企业级动态 RBAC 与行级租户隔离**（多角色字典、动态菜单权限、数据源级多字段行级过滤）；
-4. **DataX 智能助手与批量运维套件**（内置智能运维面板、支持 MCP 协议、批量改库与跨库对账）。
+2. **通用接口数据采集引擎**（前置 JavaScript 签名预处理、分页动态驱动、时间水印增量采集）；
+3. **数仓 OpenAPI 安全网关与 MCP 协议支持**（HMAC-SHA256 签名、SQL AST 语法树解析、高危写拦截、AI 工具一键接入）；
+4. **企业级动态 RBAC 与行级租户隔离**（多角色字典、动态菜单权限、数据源级多字段行级过滤）；
+5. **DataX 智能助手与批量运维套件**（批量改库、并发跨库对账核验、历史调度追踪）。
 
 ---
 
@@ -42,28 +43,37 @@
   <img src="doc/images/01_schema_drift.png" alt="Schema 漂移探测与自适应演进看板" width="95%" />
 </p>
 
-### 2. 🛡️ 数仓 OpenAPI 安全网关 (Secure Warehouse OpenAPI Gateway)
+### 2. 🌐 通用接口数据采集引擎 (HTTP/API Data Collector)
+- **可视化 HTTP 协议与前置脚本**：支持 GET/POST 请求及动态 Header/Body 组装，内置 JavaScript 前置脚本沙箱（Pre-request Script），可在线实时执行出组平台 HMAC 签名、MD5 签名及动态参数追加。
+- **动态参数切片与多模式分页驱动**：支持驱动参数 SQL 查源切片（如车辆清单、租户分组），结合 PageNum/PageSize、起始游标与期望业务状态码进行全自动深度翻页采集。
+- **时间水印与字段自动映射入仓**：支持根据采集数据的最新时间字段（如 dtTime）自动推进增量水印，支持一键同名匹配或手动映射至目标库表（MySQL / ClickHouse / Doris 等），支持 UPSERT 主键去重更新。
+
+<p align="center">
+  <img src="doc/images/04_api_collector.png" alt="接口数据采集任务配置与前置签名脚本" width="95%" />
+</p>
+
+### 3. 🛡️ 数仓 OpenAPI 安全网关与 MCP 协议生态 (OpenAPI Gateway & MCP)
 - **金融级鉴权验签与防重放**：支持标准 HMAC-SHA256 签名校验（AK/SK 机制），结合 Nonce 随机数缓存实现高效防重放攻击。
-- **SQL AST 语法树深度解析与安全审计**：
+- **Druid SQL AST 语法树深度解析与安全审计**：
   - 基于 Druid SQL AST 语法树逐层解析，强制提取物理表清单并比对权限白名单；
   - 刚性拦截写指令（DROP / TRUNCATE / UPDATE / DELETE）及高危探测函数（SLEEP / BENCHMARK / 元数据跨库探测）。
 - **细粒度库表授权与 IP 黑名单管控**：支持单账号多库多表白名单配置（JSON 策略）、动态限流 QPS，并支持在调用日志中一键拉黑异常客户端 IP。
-- **调用终端与 AI 来源审计**：全链路记录 client_source、User-Agent、执行 SQL、耗时、数据行数与安全拦截状态。
+- **一键配置全平台通用 MCP 协议**：内置跨平台自动化配置向导（`setup_mcp.bat`），支持 Trae、Cursor、DeepSeek、Qoder、WorkBuddy、OpenCode 等 AI Agent 直接安全免密调用数仓数据。
 
 <p align="center">
-  <img src="doc/images/04_api_collector.png" alt="接口数据采集任务与前置签名脚本配置" width="95%" />
+  <img src="doc/images/06_mcp_config.png" alt="通用 MCP 协议接入与 AI 工具自动化配置" width="85%" />
 </p>
 
-### 3. 👥 动态角色权限与租户级行级隔离 (Dynamic RBAC & Tenant Isolation)
+### 4. 👥 动态角色权限与租户级行级隔离 (Dynamic RBAC & Tenant Isolation)
 - **系统角色字典动态管理**：扩展 job_role 元数据，支持自定义角色（如开发员、审计员、业务分析师）及动态权限分配。
 - **跨账号权限同步与多表勾选查看**：前端管理界面支持一键跨账号复制权限策略，支持海量表的拼音/名称搜索与全选。
 - **数据源级多字段行级过滤**：在数据接入端支持根据租户、地区、机构等多维度进行行级 SQL 拼接隔离，保障多租户数据安全。
 
-### 4. 🤖 DataX 智能助手与高效运维套件 (Assistant & Batch Operations)
+### 5. 🤖 DataX 智能助手与批量运维套件 (Assistant & Batch Operations)
 - **无侵入智能助手面板**：前端内置原生 DOM 构造的高质感侧边助手，无需重构主工程即可快速扩展 Tab 视图。
 - **批量任务迁移与改库调度**：支持通过正则或字符串替换批量修改数百个任务的 Reader/Writer 连接串，支持任务批量复制与参数热插拔。
-- **任务数据量核对与跨库对账**：提供统计计算任务引擎（StatTaskEngine），自动比对源库与目标库的数据吞吐与日增量差异。
-- **支持 MCP 协议生态接入**：提供标准 Python 客户端与 MCP 工具集成，便于通过 Cursor、Trae、WorkBuddy 等 AI 工具直接安全调用数仓数据。
+- **并发批量对账与数据量核对**：内置统计计算任务引擎（StatTaskEngine），上百个任务秒级并发比对源库与目标库的数据吞吐与日增量差异。
+- **数据同步策略灵活回溯**：发现对账差异后，可一键选择全量同步（重置 1970 彻底消除差异）、向前回溯时间同步或常规增量重跑。
 
 <p align="center">
   <img src="doc/images/02_data_compare.png" alt="源库与目标库数据量批量比对看板" width="95%" />
@@ -77,9 +87,6 @@
   <img src="doc/images/05_task_history.png" alt="任务执行历史记录与写入结果明细" width="95%" />
 </p>
 
-<p align="center">
-  <img src="doc/images/06_mcp_config.png" alt="通用 MCP 协议接入与 AI 工具自动化配置" width="85%" />
-</p>
 
 ---
 
